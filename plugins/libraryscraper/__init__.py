@@ -18,7 +18,7 @@ from app.schemas import MediaType
 from app.utils.system import SystemUtils
 
 
-class LibraryScraper(_PluginBase):
+class LibraryScraperReconfiguration(_PluginBase):
     # 插件名称
     plugin_name = "媒体库刮削重构版"
     # 插件描述

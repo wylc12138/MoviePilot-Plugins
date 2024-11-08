@@ -1,5 +1,5 @@
 {
-    "LibraryScraper": {
+    "LibraryScraperReconfiguration": {
         "name": "媒体库刮削重构版",
         "description": "定时对媒体库进行刮削，获取符合条件的nfo文件并删除，达到覆盖所有nfo元数据的效果。",
         "labels": "刮削",
