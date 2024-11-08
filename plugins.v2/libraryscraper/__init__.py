@@ -122,7 +122,7 @@ class LibraryScraperReconfiguration(_PluginBase):
         if self._enabled and self._cron:
             return [{
                 "id": "LibraryScraperReconfiguration",
-                "name": "媒体库刮削",
+                "name": "媒体库刮削-重构版",
                 "trigger": CronTrigger.from_crontab(self._cron),
                 "func": self.__libraryscraper,
                 "kwargs": {}
@@ -130,7 +130,7 @@ class LibraryScraperReconfiguration(_PluginBase):
         elif self._enabled:
             return [{
                 "id": "LibraryScraperReconfiguration",
-                "name": "媒体库刮削",
+                "name": "媒体库刮削-重构版",
                 "trigger": CronTrigger.from_crontab("0 0 */7 * *"),
                 "func": self.__libraryscraper,
                 "kwargs": {}
