@@ -420,6 +420,9 @@ class LibraryScraperReconfiguration(_PluginBase):
                                                                    mtype=mediainfo.type.value)
             if transfer_history:
                 mediainfo.title = transfer_history.title
+
+        self.browse_path_and_delete_nfo(path)
+
         # 获取图片
         self.chain.obtain_images(mediainfo)
         # 刮削
@@ -500,7 +503,7 @@ class LibraryScraperReconfiguration(_PluginBase):
         # 返回一个 date 对象
         return modification_datetime.date()
 
-    def browse_path(self, path: Path):
+    def browse_path_and_delete_nfo(self, path: Path):
         """遍历目录下的文件夹，获取视频文件入库时间，然后删除视频文件对应的nfo文件，强制覆盖元数据和图片"""
         overwrite = True if self._mode else False
         if not overwrite:  # 未开启覆盖所有元数据和图片，不删除nfo文件
@@ -524,8 +527,6 @@ class LibraryScraperReconfiguration(_PluginBase):
                             logger.info(f"找到符合条件的nfo文件：{nfo_path}")
                             # 删除文件名对应的nfo文件
                             os.remove(nfo_path)
-
-
 
     def stop_service(self):
         """
