@@ -1,14 +1,14 @@
 {
     "LibraryScraper": {
-        "name": "媒体库刮削-重构版",
-        "description": "定时对媒体库进行刮削，补齐缺失元数据和图片。",
+        "name": "媒体库刮削重构版",
+        "description": "定时对媒体库进行刮削，获取符合条件的nfo文件并删除，达到覆盖所有nfo元数据的效果。",
         "labels": "刮削",
         "version": "1.0",
         "icon": "scraper.png",
         "author": "wylc12138",
         "level": 1,
         "history": {
-            "v1.0": "重构插件，增加删除指定时间内的nfo文件"
+            "v1.0": "重构插件，获取符合条件的nfo文件并删除，达到覆盖所有nfo元数据的效果"
         }
     }
 }
