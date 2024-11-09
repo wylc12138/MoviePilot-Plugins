@@ -3,11 +3,12 @@
         "name": "媒体库刮削重构版",
         "description": "定时对媒体库进行刮削，获取符合条件的nfo文件并删除，达到覆盖所有nfo元数据的效果。",
         "labels": "刮削",
-        "version": "1.0",
+        "version": "1.1",
         "icon": "scraper.png",
         "author": "wylc12138",
         "level": 1,
         "history": {
+            "v1.1": "修复无法削刮的bug",
             "v1.0": "重构插件，获取符合条件的nfo文件并删除，达到覆盖所有nfo元数据的效果"
         }
     }
