@@ -33,7 +33,7 @@ class LibraryScraperReconfiguration(_PluginBase):
     # 插件作者
     plugin_author = "wylc12138"
     # 作者主页
-    author_url = "https://github.com/wylc2138"
+    author_url = "https://github.com/wylc12138"
     # 插件配置项ID前缀
     plugin_config_prefix = "libraryscraper_reconfiguration_"
     # 加载顺序
