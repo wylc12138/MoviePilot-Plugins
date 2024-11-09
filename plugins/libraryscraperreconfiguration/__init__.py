@@ -226,6 +226,7 @@ class LibraryScraperReconfiguration(_PluginBase):
                                         "props": {
                                             "model": "offset_days",
                                             "label": "几天内",
+                                            'placeholder': '2'
                                         },
                                     }
                                 ],
