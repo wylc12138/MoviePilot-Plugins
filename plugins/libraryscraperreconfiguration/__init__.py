@@ -406,7 +406,10 @@ class LibraryScraperReconfiguration(_PluginBase):
             if transfer_history:
                 mediainfo.title = transfer_history.title
 
-        self.browse_path_and_delete_nfo(file.parent)
+        # 判断文件夹下面是否有符合条件的视频文件
+        if not self.browse_path_and_delete_nfo(file.parent):
+            logger.warn(f"{file.parent} 目录下未找到符合条件的文件")
+            return
 
         # 获取图片
         self.chain.obtain_images(mediainfo)
@@ -480,14 +483,15 @@ class LibraryScraperReconfiguration(_PluginBase):
         # 返回一个 date 对象
         return modification_datetime.date()
 
-    def browse_path(self, path: Path):
+    def browse_path_and_delete_nfo(self, path: Path) -> bool:
         """遍历目录下的文件夹，获取视频文件入库时间，然后删除视频文件对应的nfo文件，强制覆盖元数据和图片"""
         overwrite = True if self._mode else False
         if not overwrite:  # 未开启覆盖所有元数据和图片，不删除nfo文件
-            return
+            return False
         # 获取指定天数之前的日期
         end_date = self.__get_date(-int(self._offset_days))
         subfolder_path = self.get_all_subfolders(path)
+        remove_list = []
         # 遍历所有文件夹下面的所有文件，并判断是否为视频文件且修改日期在指定天数内
         for subfolder in subfolder_path:
             for file in os.listdir(subfolder):
@@ -505,6 +509,9 @@ class LibraryScraperReconfiguration(_PluginBase):
                                 logger.info(f"找到符合条件的nfo文件：{nfo_path}")
                                 # 删除文件名对应的nfo文件
                                 os.remove(nfo_path)
+                                remove_list.append(nfo_path)
+        if len(remove_list) > 0:
+            return True
 
     def stop_service(self):
         """
