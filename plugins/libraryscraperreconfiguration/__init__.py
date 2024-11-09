@@ -43,7 +43,7 @@ class LibraryScraperReconfiguration(_PluginBase):
     _scheduler = None
     _scraper = None
     # 最近天数
-    _offset_days = "0"
+    _offset_days = "2"
     # 限速开关
     _enabled = False
     _onlyonce = False
@@ -127,7 +127,7 @@ class LibraryScraperReconfiguration(_PluginBase):
             return [{
                 "id": "LibraryScraperReconfiguration",
                 "name": "媒体库刮削-重构版",
-                "trigger": CronTrigger.from_crontab("0 0 */7 * *"),
+                "trigger": CronTrigger.from_crontab("0 0 * * *"),
                 "func": self.__libraryscraper,
                 "kwargs": {}
             }]
@@ -302,7 +302,7 @@ class LibraryScraperReconfiguration(_PluginBase):
             }
         ], {
             "enabled": False,
-            "cron": "0 0 */7 * *",
+            "cron": "0 0 * * *",
             "mode": "",
             "scraper_paths": "",
             "err_hosts": ""
@@ -500,10 +500,11 @@ class LibraryScraperReconfiguration(_PluginBase):
                             # 获取文件的扩展名
                             _, extension = os.path.splitext(filepath)
                             # 获取文件名对应的nfo文件
-                            nfo_path = filepath.replace(extension, "nfo")
-                            logger.info(f"找到符合条件的nfo文件：{nfo_path}")
-                            # 删除文件名对应的nfo文件
-                            os.remove(nfo_path)
+                            nfo_path = filepath.replace(extension, ".nfo")
+                            if os.path.exists(nfo_path):
+                                logger.info(f"找到符合条件的nfo文件：{nfo_path}")
+                                # 删除文件名对应的nfo文件
+                                os.remove(nfo_path)
 
     def stop_service(self):
         """
