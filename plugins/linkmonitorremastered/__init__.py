@@ -21,6 +21,12 @@ from app.utils.system import SystemUtils
 
 lock = threading.Lock()
 
+_CODE_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9])"
+    r"(?P<code>[A-Za-z]{2,8}[-_][0-9]{2,6})"
+    r"(?![A-Za-z0-9])"
+)
+
 
 def _has_suffix_in(file_path: Path, extensions: List[str]) -> bool:
     """
@@ -36,6 +42,23 @@ def _is_download_tmp_file(file_path: Path) -> bool:
     判断文件是否为下载器尚未完成的临时文件。
     """
     return _has_suffix_in(file_path, settings.DOWNLOAD_TMPEXT)
+
+
+def _extract_code(file_path: Path) -> Optional[str]:
+    """
+    从文件名中提取番号，优先处理 @ 之后的片段，并保留原始大小写。
+    """
+    stem = file_path.stem
+    if not stem:
+        return None
+
+    if "@" in stem:
+        match = _CODE_PATTERN.search(stem.rsplit("@", 1)[-1])
+        if match:
+            return match.group("code")
+
+    match = _CODE_PATTERN.search(stem)
+    return match.group("code") if match else None
 
 
 class WatchfilesEvent:
@@ -193,11 +216,11 @@ class LinkMonitorRemastered(_PluginBase):
     # 插件名称
     plugin_name = "实时硬链接重制版"
     # 插件描述
-    plugin_desc = "监控目录文件变化，按原文件名硬链接，并支持优先跳过小于指定大小的文件。"
+    plugin_desc = "监控目录文件变化，按原文件名硬链接，并支持优先跳过小文件及识别番号重命名。"
     # 插件图标
     plugin_icon = "Linkace_C.png"
     # 插件版本
-    plugin_version = "2.0.0"
+    plugin_version = "2.1.0"
     # 插件作者
     plugin_author = "wylc12138"
     # 作者主页
@@ -218,6 +241,7 @@ class LinkMonitorRemastered(_PluginBase):
     _cron = None
     _size = 0
     _skip_size = 0
+    _rename_code = False
     # 转移方式
     _monitor_dirs = ""
     _exclude_keywords = ""
@@ -247,6 +271,7 @@ class LinkMonitorRemastered(_PluginBase):
             self._cron = config.get("cron")
             self._size = config.get("size") or 0
             self._skip_size = config.get("skip_size") or 0
+            self._rename_code = bool(config.get("rename_code"))
 
         # 停止现有任务
         self.stop_service()
@@ -352,7 +377,8 @@ class LinkMonitorRemastered(_PluginBase):
             "exclude_keywords": self._exclude_keywords,
             "cron": self._cron,
             "size": self._size,
-            "skip_size": self._skip_size
+            "skip_size": self._skip_size,
+            "rename_code": self._rename_code
         })
 
     @eventmanager.register(EventType.PluginAction)
@@ -399,7 +425,8 @@ class LinkMonitorRemastered(_PluginBase):
 
     @staticmethod
     def _link_file(src_path: Path, mon_path: str,
-                   target_path: Path, transfer_type: str = "link") -> Tuple[bool, str]:
+                   target_path: Path, transfer_type: str = "link",
+                   new_name: Optional[str] = None) -> Tuple[bool, str]:
         """
         对文件做纯链接处理，不做识别重命名，则监控模块调用
         :param : 来源渠道
@@ -412,6 +439,8 @@ class LinkMonitorRemastered(_PluginBase):
             rel_path = src_path.relative_to(Path(mon_path))
         except ValueError:
             return False, "文件路径不在监控目录内"
+        if new_name:
+            rel_path = rel_path.with_name(new_name)
         new_path = target_path / rel_path
         if new_path.exists():
             return True, "目标路径文件已存在"
@@ -480,6 +509,15 @@ class LinkMonitorRemastered(_PluginBase):
                     else:
                         _transfer_type = "link"
 
+                # 识别番号重命名，无法提取番号时跳过该文件
+                new_name = None
+                if self._rename_code:
+                    code = _extract_code(file_path)
+                    if not code:
+                        logger.info(f"{event_path} 无法识别番号，跳过硬链接")
+                        return
+                    new_name = f"{code}{file_path.suffix}"
+
                 # 查询转移目的目录
                 target: Path = self._dirconf.get(mon_path)
                 if not target:
@@ -488,25 +526,28 @@ class LinkMonitorRemastered(_PluginBase):
 
                 # 开始硬连接
                 state, errmsg = self._link_file(src_path=file_path, mon_path=mon_path,
-                                                target_path=target, transfer_type=_transfer_type)
+                                                target_path=target, transfer_type=_transfer_type,
+                                                new_name=new_name)
 
                 if not state:
                     # 转移失败
-                    logger.warn(f"{file_path.name} 硬链接失败：{errmsg}")
+                    target_name = new_name or file_path.name
+                    logger.warn(f"{target_name} 硬链接失败：{errmsg}")
                     if self._notify:
                         self.post_message(
                             mtype=NotificationType.Manual,
-                            title=f"{file_path.name} 硬链接失败！",
+                            title=f"{target_name} 硬链接失败！",
                             text=f"原因：{errmsg or '未知'}"
                         )
                     return
 
                 # 转移成功
-                logger.info(f"{file_path.name} 硬链接成功")
+                target_name = new_name or file_path.name
+                logger.info(f"{target_name} 硬链接成功")
                 if self._notify:
                     self.post_message(
                         mtype=NotificationType.Manual,
-                        title=f"{file_path.name} 硬链接完成！",
+                        title=f"{target_name} 硬链接完成！",
                         text=f"目标目录：{target}"
                     )
 
@@ -706,6 +747,22 @@ class LinkMonitorRemastered(_PluginBase):
                                         }
                                     }
                                 ]
+                            },
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                    'md': 4
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VSwitch',
+                                        'props': {
+                                            'model': 'rename_code',
+                                            'label': '识别番号命名',
+                                        }
+                                    }
+                                ]
                             }
                         ]
                     },
@@ -769,7 +826,7 @@ class LinkMonitorRemastered(_PluginBase):
                                         'props': {
                                             'type': 'info',
                                             'variant': 'tonal',
-                                            'text': '跳过文件大小：填写后优先跳过小于该大小的文件，并忽略最小文件大小规则；最小文件大小：未填写跳过文件大小时，小于该大小的文件直接复制，其余硬链接。'
+                                            'text': '跳过文件大小：填写后优先跳过小于该大小的文件，并忽略最小文件大小规则；最小文件大小：未填写跳过文件大小时，小于该大小的文件直接复制，其余硬链接；识别番号命名：开启后仅保留提取出的番号和原扩展名，无法提取番号时跳过该文件。'
                                         }
                                     }
                                 ]
@@ -787,7 +844,8 @@ class LinkMonitorRemastered(_PluginBase):
             "exclude_keywords": "",
             "cron": "",
             "size": "",
-            "skip_size": ""
+            "skip_size": "",
+            "rename_code": False
         }
 
     def get_page(self) -> List[dict]:
