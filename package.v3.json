@@ -1,0 +1,19 @@
+{
+  "LinkMonitor": {
+    "name": "实时硬链接",
+    "description": "监控目录文件变化，按原文件名硬链接，并支持跳过小于指定大小的文件。",
+    "labels": "文件整理",
+    "version": "2.0.0",
+    "icon": "Linkace_C.png",
+    "author": "jxxghp",
+    "level": 1,
+    "release": true,
+    "system_version": ">=3.0.0",
+    "history": {
+      "v2.0.0": "增加跳过小于指定大小的文件配置，并适配 MoviePilot V3。",
+      "v1.7.1": "过滤下载临时文件，避免实时硬链接处理未完成文件",
+      "v1.7": "目录监控改用watchfiles，移除旧监控依赖",
+      "v1.6": "增强API安全性"
+    }
+  }
+}
