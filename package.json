@@ -13,7 +13,7 @@
             "v1.0": "重构插件，获取符合条件的nfo文件并删除，达到覆盖所有nfo元数据的效果"
         }
     },
-    "LinkMonitor": {
+    "LinkMonitorRemastered": {
         "name": "实时硬链接重制版",
         "description": "监控目录文件变化，按原文件名硬链接，并支持优先跳过小于指定大小的文件。",
         "labels": "文件整理",
