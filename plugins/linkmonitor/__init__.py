@@ -11,13 +11,13 @@ from apscheduler.triggers.cron import CronTrigger
 from watchfiles import Change, watch
 
 from app import schemas
-from app.sdk.config import settings
-from app.sdk.events import eventmanager, Event
-from app.sdk.logging import logger
-from app.sdk.plugin import _PluginBase
+from app.core.config import settings
+from app.core.event import eventmanager, Event
+from app.log import logger
+from app.plugins import _PluginBase
 from app.schemas import NotificationType
 from app.schemas.types import EventType
-from app.sdk.utilities import SystemUtils
+from app.utils.system import SystemUtils
 
 lock = threading.Lock()
 
@@ -191,9 +191,9 @@ class FileMonitorHandler:
 
 class LinkMonitor(_PluginBase):
     # 插件名称
-    plugin_name = "实时硬链接"
+    plugin_name = "实时硬链接重制版"
     # 插件描述
-    plugin_desc = "监控目录文件变化，按原文件名硬链接。"
+    plugin_desc = "监控目录文件变化，按原文件名硬链接，并支持优先跳过小于指定大小的文件。"
     # 插件图标
     plugin_icon = "Linkace_C.png"
     # 插件版本
@@ -462,16 +462,23 @@ class LinkMonitor(_PluginBase):
                     skip_size = float(self._skip_size or 0)
                 except (TypeError, ValueError):
                     skip_size = 0
-                if skip_size > 0 and file_size < skip_size * 1024:
-                    logger.info(f"{event_path} 文件大小小于跳过大小，不处理")
-                    return
-
-                # 判断文件大小
-                if self._size and float(self._size) > 0 and file_size < float(self._size) * 1024:
-                    logger.info(f"{event_path} 文件大小小于最小文件大小，复制...")
-                    _transfer_type = "copy"
-                else:
+                if skip_size > 0:
+                    # 跳过规则优先，配置后不再应用最小文件大小规则
+                    if file_size < skip_size * 1024:
+                        logger.info(f"{event_path} 文件大小小于跳过大小，不处理")
+                        return
                     _transfer_type = "link"
+                else:
+                    # 未填写跳过大小时，沿用最小文件大小规则
+                    try:
+                        min_size = float(self._size or 0)
+                    except (TypeError, ValueError):
+                        min_size = 0
+                    if min_size > 0 and file_size < min_size * 1024:
+                        logger.info(f"{event_path} 文件大小小于最小文件大小，复制...")
+                        _transfer_type = "copy"
+                    else:
+                        _transfer_type = "link"
 
                 # 查询转移目的目录
                 target: Path = self._dirconf.get(mon_path)
@@ -762,7 +769,7 @@ class LinkMonitor(_PluginBase):
                                         'props': {
                                             'type': 'info',
                                             'variant': 'tonal',
-                                            'text': '最小文件大小：小于最小文件大小的文件将直接复制，其余则硬链接；跳过文件大小：小于该大小的文件不处理。'
+                                            'text': '跳过文件大小：填写后优先跳过小于该大小的文件，并忽略最小文件大小规则；最小文件大小：未填写跳过文件大小时，小于该大小的文件直接复制，其余硬链接。'
                                         }
                                     }
                                 ]
