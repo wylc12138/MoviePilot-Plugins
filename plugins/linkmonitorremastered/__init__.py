@@ -220,7 +220,7 @@ class LinkMonitorRemastered(_PluginBase):
     # 插件图标
     plugin_icon = "Linkace_C.png"
     # 插件版本
-    plugin_version = "2.2.0"
+    plugin_version = "2.2.1"
     # 插件作者
     plugin_author = "wylc12138"
     # 作者主页
@@ -448,7 +448,7 @@ class LinkMonitorRemastered(_PluginBase):
         if new_name:
             rel_path = rel_path.with_name(new_name)
         if flatten_dirs and len(rel_path.parts) > 2:
-            rel_path = Path(rel_path.parent.name) / rel_path.name
+            rel_path = Path(rel_path.stem) / rel_path.name
         new_path = target_path / rel_path
         if new_path.exists():
             return True, "目标路径文件已存在"
@@ -851,7 +851,7 @@ class LinkMonitorRemastered(_PluginBase):
                                         'props': {
                                             'type': 'info',
                                             'variant': 'tonal',
-                                            'text': '跳过文件大小：填写后优先跳过小于该大小的文件，并忽略最小文件大小规则；最小文件大小：未填写跳过文件大小时，小于该大小的文件直接复制，其余硬链接；识别番号命名：开启后仅保留提取出的番号和原扩展名，无法提取番号时跳过该文件；仅保留一层目录：开启后超过一层目录的文件只保留文件所在目录这一层。'
+                                            'text': '跳过文件大小：填写后优先跳过小于该大小的文件，并忽略最小文件大小规则；最小文件大小：未填写跳过文件大小时，小于该大小的文件直接复制，其余硬链接；识别番号命名：开启后仅保留提取出的番号和原扩展名，无法提取番号时跳过该文件；仅保留一层目录：开启后超过一层目录的文件只保留一层目录，目录名使用去除扩展名后的文件名。'
                                         }
                                     }
                                 ]
