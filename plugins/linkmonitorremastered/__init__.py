@@ -216,11 +216,11 @@ class LinkMonitorRemastered(_PluginBase):
     # 插件名称
     plugin_name = "实时硬链接重制版"
     # 插件描述
-    plugin_desc = "监控目录文件变化，按原文件名硬链接，并支持优先跳过小文件及识别番号重命名。"
+    plugin_desc = "监控目录文件变化，按原文件名硬链接，支持跳过小文件、识别番号重命名和仅保留一层目录。"
     # 插件图标
     plugin_icon = "Linkace_C.png"
     # 插件版本
-    plugin_version = "2.1.0"
+    plugin_version = "2.2.0"
     # 插件作者
     plugin_author = "wylc12138"
     # 作者主页
@@ -242,6 +242,7 @@ class LinkMonitorRemastered(_PluginBase):
     _size = 0
     _skip_size = 0
     _rename_code = False
+    _flatten_dirs = False
     # 转移方式
     _monitor_dirs = ""
     _exclude_keywords = ""
@@ -272,6 +273,7 @@ class LinkMonitorRemastered(_PluginBase):
             self._size = config.get("size") or 0
             self._skip_size = config.get("skip_size") or 0
             self._rename_code = bool(config.get("rename_code"))
+            self._flatten_dirs = bool(config.get("flatten_dirs"))
 
         # 停止现有任务
         self.stop_service()
@@ -378,7 +380,8 @@ class LinkMonitorRemastered(_PluginBase):
             "cron": self._cron,
             "size": self._size,
             "skip_size": self._skip_size,
-            "rename_code": self._rename_code
+            "rename_code": self._rename_code,
+            "flatten_dirs": self._flatten_dirs
         })
 
     @eventmanager.register(EventType.PluginAction)
@@ -426,13 +429,16 @@ class LinkMonitorRemastered(_PluginBase):
     @staticmethod
     def _link_file(src_path: Path, mon_path: str,
                    target_path: Path, transfer_type: str = "link",
-                   new_name: Optional[str] = None) -> Tuple[bool, str]:
+                   new_name: Optional[str] = None,
+                   flatten_dirs: bool = False) -> Tuple[bool, str]:
         """
         对文件做纯链接处理，不做识别重命名，则监控模块调用
         :param : 来源渠道
         :param src_path: 源文件
         :param target_path: 目标目录
         :param transfer_type: 转移方式
+        :param new_name: 目标文件名
+        :param flatten_dirs: 仅保留一层目录
         """
         # 计算相对路径
         try:
@@ -441,6 +447,8 @@ class LinkMonitorRemastered(_PluginBase):
             return False, "文件路径不在监控目录内"
         if new_name:
             rel_path = rel_path.with_name(new_name)
+        if flatten_dirs and len(rel_path.parts) > 2:
+            rel_path = Path(rel_path.parent.name) / rel_path.name
         new_path = target_path / rel_path
         if new_path.exists():
             return True, "目标路径文件已存在"
@@ -527,7 +535,8 @@ class LinkMonitorRemastered(_PluginBase):
                 # 开始硬连接
                 state, errmsg = self._link_file(src_path=file_path, mon_path=mon_path,
                                                 target_path=target, transfer_type=_transfer_type,
-                                                new_name=new_name)
+                                                new_name=new_name,
+                                                flatten_dirs=self._flatten_dirs)
 
                 if not state:
                     # 转移失败
@@ -763,6 +772,22 @@ class LinkMonitorRemastered(_PluginBase):
                                         }
                                     }
                                 ]
+                            },
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                    'md': 4
+                                },
+                                'content': [
+                                    {
+                                        'component': 'VSwitch',
+                                        'props': {
+                                            'model': 'flatten_dirs',
+                                            'label': '仅保留一层目录',
+                                        }
+                                    }
+                                ]
                             }
                         ]
                     },
@@ -826,7 +851,7 @@ class LinkMonitorRemastered(_PluginBase):
                                         'props': {
                                             'type': 'info',
                                             'variant': 'tonal',
-                                            'text': '跳过文件大小：填写后优先跳过小于该大小的文件，并忽略最小文件大小规则；最小文件大小：未填写跳过文件大小时，小于该大小的文件直接复制，其余硬链接；识别番号命名：开启后仅保留提取出的番号和原扩展名，无法提取番号时跳过该文件。'
+                                            'text': '跳过文件大小：填写后优先跳过小于该大小的文件，并忽略最小文件大小规则；最小文件大小：未填写跳过文件大小时，小于该大小的文件直接复制，其余硬链接；识别番号命名：开启后仅保留提取出的番号和原扩展名，无法提取番号时跳过该文件；仅保留一层目录：开启后超过一层目录的文件只保留文件所在目录这一层。'
                                         }
                                     }
                                 ]
@@ -845,7 +870,8 @@ class LinkMonitorRemastered(_PluginBase):
             "cron": "",
             "size": "",
             "skip_size": "",
-            "rename_code": False
+            "rename_code": False,
+            "flatten_dirs": False
         }
 
     def get_page(self) -> List[dict]:
