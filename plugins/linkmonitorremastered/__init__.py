@@ -3,7 +3,7 @@ import re
 import threading
 import traceback
 from pathlib import Path
-from typing import List, Tuple, Dict, Any, Optional
+from typing import List, Tuple, Dict, Any, Optional, Set
 
 import pytz
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -220,7 +220,7 @@ class LinkMonitorRemastered(_PluginBase):
     # 插件图标
     plugin_icon = "Linkace_C.png"
     # 插件版本
-    plugin_version = "2.2.2"
+    plugin_version = "2.2.3"
     # 插件作者
     plugin_author = "wylc12138"
     # 作者主页
@@ -408,9 +408,12 @@ class LinkMonitorRemastered(_PluginBase):
         logger.info("开始全量实时硬链接重制版 ...")
         # 遍历所有监控目录
         for mon_path in self._dirconf.keys():
+            target_path = self._dirconf.get(mon_path)
+            hardlink_index = self._build_hardlink_index(target_path) if target_path else set()
             # 遍历目录下所有文件
             for file_path in SystemUtils.list_files(Path(mon_path), ['.*']):
-                self.__handle_file(event_path=str(file_path), mon_path=mon_path)
+                self.__handle_file(event_path=str(file_path), mon_path=mon_path,
+                                   existing_hardlink_index=hardlink_index)
         logger.info("全量实时硬链接重制版完成！")
 
     def event_handler(self, event, mon_path: str, text: str, event_path: str):
@@ -439,6 +442,31 @@ class LinkMonitorRemastered(_PluginBase):
         if flatten_dirs and len(rel_path.parts) > 2:
             rel_path = Path(rel_path.stem) / rel_path.name
         return rel_path
+
+    @staticmethod
+    def _file_identity(file_path: Path) -> Optional[Tuple[int, int]]:
+        """
+        返回文件的设备号和 inode，用于识别是否为同一个硬链接文件。
+        """
+        try:
+            stat = file_path.stat()
+            return stat.st_dev, stat.st_ino
+        except OSError:
+            return None
+
+    @staticmethod
+    def _build_hardlink_index(target_path: Path) -> Set[Tuple[int, int]]:
+        """
+        构建目标目录树下所有文件的硬链接身份索引。
+        """
+        identities: Set[Tuple[int, int]] = set()
+        if not target_path or not Path(target_path).exists():
+            return identities
+        for file_path in SystemUtils.list_files(Path(target_path), ['.*']):
+            identity = LinkMonitorRemastered._file_identity(file_path)
+            if identity:
+                identities.add(identity)
+        return identities
 
     @staticmethod
     def _link_file(src_path: Path, mon_path: str,
@@ -483,11 +511,13 @@ class LinkMonitorRemastered(_PluginBase):
                 code, errmsg = SystemUtils.link(src_path, new_path)
             return True if code == 0 else False, errmsg
 
-    def __handle_file(self, event_path: str, mon_path: str):
+    def __handle_file(self, event_path: str, mon_path: str,
+                      existing_hardlink_index: Optional[Set[Tuple[int, int]]] = None):
         """
         同步一个文件
         :param event_path: 事件文件路径
         :param mon_path: 监控目录
+        :param existing_hardlink_index: 全量同步时的目标目录硬链接索引
         """
         file_path = Path(event_path)
         try:
@@ -554,18 +584,24 @@ class LinkMonitorRemastered(_PluginBase):
 
                 target_name = new_name or file_path.name
                 if _transfer_type == "link":
-                    try:
-                        target_file = target / self._build_target_path(
-                            src_path=file_path,
-                            mon_path=mon_path,
-                            new_name=new_name,
-                            flatten_dirs=self._flatten_dirs
-                        )
-                        if target_file.exists() and file_path.samefile(target_file):
-                            logger.info(f"{target_name} 已存在对应硬链接，跳过")
+                    if existing_hardlink_index is not None:
+                        identity = self._file_identity(file_path)
+                        if identity and identity in existing_hardlink_index:
+                            logger.info(f"{target_name} 已在目标目录中存在硬链接，跳过")
                             return
-                    except (OSError, ValueError):
-                        pass
+                    else:
+                        try:
+                            target_file = target / self._build_target_path(
+                                src_path=file_path,
+                                mon_path=mon_path,
+                                new_name=new_name,
+                                flatten_dirs=self._flatten_dirs
+                            )
+                            if target_file.exists() and file_path.samefile(target_file):
+                                logger.info(f"{target_name} 已存在对应硬链接，跳过")
+                                return
+                        except (OSError, ValueError):
+                            pass
 
                 # 开始硬连接
                 state, errmsg = self._link_file(src_path=file_path, mon_path=mon_path,
