@@ -220,7 +220,7 @@ class LinkMonitorRemastered(_PluginBase):
     # 插件图标
     plugin_icon = "Linkace_C.png"
     # 插件版本
-    plugin_version = "2.2.1"
+    plugin_version = "2.2.2"
     # 插件作者
     plugin_author = "wylc12138"
     # 作者主页
@@ -427,6 +427,20 @@ class LinkMonitorRemastered(_PluginBase):
             self.__handle_file(event_path=event_path, mon_path=mon_path)
 
     @staticmethod
+    def _build_target_path(src_path: Path, mon_path: str,
+                           new_name: Optional[str] = None,
+                           flatten_dirs: bool = False) -> Path:
+        """
+        计算文件相对监控目录的目标路径。
+        """
+        rel_path = src_path.relative_to(Path(mon_path))
+        if new_name:
+            rel_path = rel_path.with_name(new_name)
+        if flatten_dirs and len(rel_path.parts) > 2:
+            rel_path = Path(rel_path.stem) / rel_path.name
+        return rel_path
+
+    @staticmethod
     def _link_file(src_path: Path, mon_path: str,
                    target_path: Path, transfer_type: str = "link",
                    new_name: Optional[str] = None,
@@ -442,15 +456,21 @@ class LinkMonitorRemastered(_PluginBase):
         """
         # 计算相对路径
         try:
-            rel_path = src_path.relative_to(Path(mon_path))
+            rel_path = LinkMonitorRemastered._build_target_path(
+                src_path=src_path,
+                mon_path=mon_path,
+                new_name=new_name,
+                flatten_dirs=flatten_dirs
+            )
         except ValueError:
             return False, "文件路径不在监控目录内"
-        if new_name:
-            rel_path = rel_path.with_name(new_name)
-        if flatten_dirs and len(rel_path.parts) > 2:
-            rel_path = Path(rel_path.stem) / rel_path.name
         new_path = target_path / rel_path
         if new_path.exists():
+            try:
+                if src_path.exists() and src_path.samefile(new_path):
+                    return True, "目标已存在对应硬链接"
+            except OSError:
+                pass
             return True, "目标路径文件已存在"
         else:
             # 创建目标目录
@@ -532,6 +552,21 @@ class LinkMonitorRemastered(_PluginBase):
                     logger.warn(f"{mon_path} 未配置目的目录，将不会进行硬链接")
                     return
 
+                target_name = new_name or file_path.name
+                if _transfer_type == "link":
+                    try:
+                        target_file = target / self._build_target_path(
+                            src_path=file_path,
+                            mon_path=mon_path,
+                            new_name=new_name,
+                            flatten_dirs=self._flatten_dirs
+                        )
+                        if target_file.exists() and file_path.samefile(target_file):
+                            logger.info(f"{target_name} 已存在对应硬链接，跳过")
+                            return
+                    except (OSError, ValueError):
+                        pass
+
                 # 开始硬连接
                 state, errmsg = self._link_file(src_path=file_path, mon_path=mon_path,
                                                 target_path=target, transfer_type=_transfer_type,
@@ -540,7 +575,6 @@ class LinkMonitorRemastered(_PluginBase):
 
                 if not state:
                     # 转移失败
-                    target_name = new_name or file_path.name
                     logger.warn(f"{target_name} 硬链接失败：{errmsg}")
                     if self._notify:
                         self.post_message(
@@ -551,14 +585,16 @@ class LinkMonitorRemastered(_PluginBase):
                     return
 
                 # 转移成功
-                target_name = new_name or file_path.name
-                logger.info(f"{target_name} 硬链接成功")
-                if self._notify:
-                    self.post_message(
-                        mtype=NotificationType.Manual,
-                        title=f"{target_name} 硬链接完成！",
-                        text=f"目标目录：{target}"
-                    )
+                if errmsg and "已存在" in errmsg:
+                    logger.info(f"{target_name} {errmsg}，跳过")
+                else:
+                    logger.info(f"{target_name} 硬链接成功")
+                    if self._notify:
+                        self.post_message(
+                            mtype=NotificationType.Manual,
+                            title=f"{target_name} 硬链接完成！",
+                            text=f"目标目录：{target}"
+                        )
 
         except Exception as e:
             logger.error("目录监控发生错误：%s - %s" % (str(e), traceback.format_exc()))
